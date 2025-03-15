@@ -1,0 +1,14 @@
+# Dependencias de Node
+node_modules
+
+# Directorio de salida de TypeScript
+dist
+
+# Archivos de entorno
+.env
+
+# Logs de npm
+npm-debug.log
+
+# Archivos del sistema macOS
+.DS_Store

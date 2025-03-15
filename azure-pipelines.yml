@@ -1,0 +1,85 @@
+# Pipeline para test-backend
+name: $(Build.BuildId)
+
+# Trigger de CI
+trigger:
+  branches:
+    include:
+      - master
+      - develop
+  paths:
+    include:
+      - '*'
+    exclude:
+      - '*.md'
+      - 'docs/*'
+
+# Recursos
+resources:
+  repositories:
+    - repository: self
+      type: git
+      name: test-backend
+
+# Variables globales
+variables:
+# Grupo de variables en la biblioteca
+- group: 'azure-connection' 
+- group: 'production-variables'
+
+# Variables de construcción
+- name: dockerfilePath
+  value: '$(Build.SourcesDirectory)/Dockerfile'
+- name: tag
+  value: '$(Build.BuildId)'
+- name: vmImageName
+  value: 'ubuntu-latest'
+
+# Variables de entorno
+- name: customVariable1
+  value: '$(prodCustomVariable1)'
+- name: customVariable2
+  value: '$(prodCustomVariable2)'
+
+stages:
+  - stage: Build
+    displayName: 'Build y Push'
+    jobs:
+      - job: BuildAndPush
+        displayName: 'Construir y Publicar Imagen'
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - task: Docker@2
+            displayName: 'Build y Push de Imagen Docker'
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(tag)
+                latest
+              arguments: '--build-arg BUILD_VERSION=$(Build.BuildId)'
+
+  - stage: Deploy
+    displayName: 'Despliegue'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: Deploy
+        displayName: 'Desplegar a Azure Web App'
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - task: AzureWebAppContainer@1
+            displayName: 'Desplegar contenedor en Azure Web App'
+            inputs:
+              azureSubscription: '$(subscriptionId)'
+              appName: 'asapplog'
+              containers: '$(containerRegistry)/$(imageRepository):$(Build.BuildId)'
+              appSettings: |
+                -CUSTOM_VARIABLE_1 $(customVariable1)
+                -CUSTOM_VARIABLE_2 $(customVariable2)
